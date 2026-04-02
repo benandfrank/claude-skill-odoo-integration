@@ -16,6 +16,15 @@ For future releases:
 
 ## v2.0.0
 
+### Changed (documentation consolidation)
+- Consolidated `review-checklist.md` + `review-workflow.md` into `reviewing.md`
+- Consolidated `glossary.md` + `FAQ.md` into `concepts.md`
+- Consolidated `principles.md` + `guarantees-vs-assumptions.md` into `stance.md`
+- Reduced `docs/` from 12 files to 9 without losing content
+- Added table of contents to `SKILL.md`
+- Added `.gitignore`
+- Added skill testing strategy, golden prompt suite, results template, and example scored output
+
 ### Changed
 - Repositioned the skill from XML-RPC script guidance to operable Odoo integration guidance
 - Added explicit sync contract guidance

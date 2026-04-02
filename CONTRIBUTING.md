@@ -5,7 +5,7 @@ Related docs:
 - [`SKILL.md`](SKILL.md)
 - [`MAINTAINERS.md`](MAINTAINERS.md)
 - [`docs/README.md`](docs/README.md)
-- [`docs/principles.md`](docs/principles.md)
+- [`docs/stance.md`](docs/stance.md)
 - [`docs/release-checklist.md`](docs/release-checklist.md)
 
 Thanks for contributing to `claude-skill-odoo-integration`.
@@ -33,7 +33,7 @@ When proposing a change:
 - [`CHANGELOG.md`](CHANGELOG.md)
 - [`.env.example`](.env.example)
 - [`MAINTAINERS.md`](MAINTAINERS.md)
-- [`docs/principles.md`](docs/principles.md)
+- [`docs/stance.md`](docs/stance.md)
 - [`docs/release-checklist.md`](docs/release-checklist.md)
 
 ## Good contribution examples
@@ -62,7 +62,7 @@ Before opening or merging a change, verify:
 - config examples still match documented expectations
 - new guidance works for both lightweight and production-grade integrations
 - observability, checkpointing, and testing remain explicit
-- [`docs/principles.md`](docs/principles.md) still reflects the intended engineering stance
+- [`docs/stance.md`](docs/stance.md) still reflects the intended engineering stance
 - [`docs/release-checklist.md`](docs/release-checklist.md) still matches release expectations
 
 ## Pull request guidance

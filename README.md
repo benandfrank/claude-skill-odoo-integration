@@ -257,25 +257,18 @@ Keep it simple, but make the checkpoint explicit and avoid duplicate rows.
 ```
 
 For more detailed patterns, see:
-- [`SKILL.md`](SKILL.md)
-- [`EXAMPLES.md`](EXAMPLES.md)
-- [`.env.example`](.env.example)
-- [`docs/README.md`](docs/README.md)
-- [`docs/operability.md`](docs/operability.md)
-- [`docs/glossary.md`](docs/glossary.md)
-- [`docs/review-checklist.md`](docs/review-checklist.md)
-- [`docs/review-workflow.md`](docs/review-workflow.md)
-- [`docs/decision-tree.md`](docs/decision-tree.md)
-- [`docs/FAQ.md`](docs/FAQ.md)
-- [`docs/prompt-templates.md`](docs/prompt-templates.md)
-- [`docs/anti-patterns.md`](docs/anti-patterns.md)
-- [`docs/principles.md`](docs/principles.md)
-- [`docs/release-checklist.md`](docs/release-checklist.md)
-- [`docs/guarantees-vs-assumptions.md`](docs/guarantees-vs-assumptions.md)
-- [`TESTING.md`](TESTING.md)
-- [`tests/manual-test-cases.md`](tests/manual-test-cases.md)
-- [`tests/results-template.md`](tests/results-template.md)
-- [`MIGRATION-v1-to-v2.md`](MIGRATION-v1-to-v2.md)
+- [`SKILL.md`](SKILL.md) — canonical skill behavior
+- [`EXAMPLES.md`](EXAMPLES.md) — example scenarios
+- [`docs/README.md`](docs/README.md) — documentation index
+- [`docs/concepts.md`](docs/concepts.md) — glossary and FAQ
+- [`docs/reviewing.md`](docs/reviewing.md) — review workflow and checklist
+- [`docs/operability.md`](docs/operability.md) — checkpointing, sinks, observability
+- [`docs/decision-tree.md`](docs/decision-tree.md) — sync mode and sink selection
+- [`docs/stance.md`](docs/stance.md) — principles and guarantees vs assumptions
+- [`docs/prompt-templates.md`](docs/prompt-templates.md) — safer prompt shapes
+- [`docs/anti-patterns.md`](docs/anti-patterns.md) — common failure modes
+- [`TESTING.md`](TESTING.md) — skill testing strategy
+- [`MIGRATION-v1-to-v2.md`](MIGRATION-v1-to-v2.md) — migration from v1
 
 ---
 
@@ -310,14 +303,14 @@ If the user does not specify otherwise, the skill tends to prefer:
 
 ### New user
 1. [`README.md`](README.md)
-2. [`docs/glossary.md`](docs/glossary.md)
+2. [`docs/concepts.md`](docs/concepts.md)
 3. [`docs/decision-tree.md`](docs/decision-tree.md)
 4. [`EXAMPLES.md`](EXAMPLES.md)
 
 ### Reviewer
-1. [`docs/review-workflow.md`](docs/review-workflow.md)
-2. [`docs/review-checklist.md`](docs/review-checklist.md)
-3. [`docs/guarantees-vs-assumptions.md`](docs/guarantees-vs-assumptions.md)
+1. [`docs/reviewing.md`](docs/reviewing.md)
+2. [`docs/stance.md`](docs/stance.md)
+3. [`docs/anti-patterns.md`](docs/anti-patterns.md)
 4. [`SKILL.md`](SKILL.md)
 
 ### Maintainer
@@ -330,7 +323,7 @@ If the user does not specify otherwise, the skill tends to prefer:
 
 ## How to review a generated integration
 
-Use [`docs/review-workflow.md`](docs/review-workflow.md) as the fast path, and [`docs/review-checklist.md`](docs/review-checklist.md) as the compact checklist.
+Use [`docs/reviewing.md`](docs/reviewing.md) — it combines the review workflow and checklist in one page.
 
 At minimum, check that the generated integration makes these explicit:
 - sync mode

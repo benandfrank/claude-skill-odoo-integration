@@ -40,8 +40,8 @@ Identify anti-patterns and suggest the smallest safe improvements.
 ## Reviewer prompt examples
 
 ```text
-Review this generated Odoo sync using the repo's review checklist, anti-patterns,
-and guarantees-vs-assumptions guidance. Tell me what is explicit, what is risky,
+Review this generated Odoo sync using the repo's reviewing guide, anti-patterns,
+and engineering stance docs. Tell me what is explicit, what is risky,
 and what still needs target-instance verification.
 ```
 

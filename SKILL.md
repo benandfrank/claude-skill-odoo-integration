@@ -7,6 +7,35 @@ license: MIT. See LICENSE.txt
 
 # Odoo Integration Skill
 
+## Table of contents
+
+- [Operating Principles](#operating-principles)
+- [Docs map](#docs-map)
+- [Recommended Architecture](#recommended-architecture)
+- [Sync Contract](#sync-contract--define-this-before-coding)
+- [Odoo Access Layer](#odoo-access-layer)
+- [Odoo Domain Knowledge](#odoo-domain-knowledge)
+- [Version Compatibility Rules](#version-compatibility-rules)
+- [Query and Mapping Guidance](#query-and-mapping-guidance)
+- [Sync Run Flow](#sync-run-flow)
+- [Output Sinks](#output-sinks)
+- [Scheduling and Runtime](#scheduling-and-runtime)
+- [Configuration Contract](#configuration-contract)
+- [Testing Strategy](#testing-strategy)
+- [Observability](#observability)
+- [Resiliency and Reliability](#resiliency-and-reliability)
+- [Security](#security)
+- [Diagnostics and Support Scripts](#diagnostics-and-support-scripts)
+- [Anti-patterns to avoid](#anti-patterns-to-avoid)
+- [Common Odoo Gotchas](#common-odoo-gotchas)
+- [Support matrix](#support-matrix)
+- [Deployment Guidance](#deployment-guidance)
+- [package.json Guidance](#packagejson-guidance)
+- [Checklist for Every New Odoo Integration](#checklist-for-every-new-odoo-integration)
+- [Practical Defaults](#practical-defaults)
+
+---
+
 You are an expert in Odoo integrations and operationally safe sync design.
 
 You know how to integrate with Odoo using XML-RPC and version-aware access patterns across Odoo v8 through v17+. You design integrations that are:
@@ -25,10 +54,10 @@ For supporting material and compact usage examples, also see:
 - [`EXAMPLES.md`](EXAMPLES.md)
 - [`docs/operability.md`](docs/operability.md)
 - [`docs/decision-tree.md`](docs/decision-tree.md)
-- [`docs/FAQ.md`](docs/FAQ.md)
+- [`docs/concepts.md`](docs/concepts.md)
 - [`docs/prompt-templates.md`](docs/prompt-templates.md)
 - [`docs/anti-patterns.md`](docs/anti-patterns.md)
-- [`docs/guarantees-vs-assumptions.md`](docs/guarantees-vs-assumptions.md)
+- [`docs/stance.md`](docs/stance.md)
 - [`TESTING.md`](TESTING.md)
 - [`MIGRATION-v1-to-v2.md`](MIGRATION-v1-to-v2.md)
 
@@ -39,10 +68,10 @@ Use the repo docs like this:
 - use [`EXAMPLES.md`](EXAMPLES.md) for concrete scenarios
 - use [`docs/operability.md`](docs/operability.md) for runtime guidance
 - use [`docs/decision-tree.md`](docs/decision-tree.md) for sink and sync-mode selection
-- use [`docs/FAQ.md`](docs/FAQ.md) for recurring questions
+- use [`docs/concepts.md`](docs/concepts.md) for recurring questions
 - use [`docs/prompt-templates.md`](docs/prompt-templates.md) for safer prompt shapes
 - use [`docs/anti-patterns.md`](docs/anti-patterns.md) for common failure modes
-- use [`docs/guarantees-vs-assumptions.md`](docs/guarantees-vs-assumptions.md) to understand guidance vs environment-specific verification
+- use [`docs/stance.md`](docs/stance.md) to understand guidance vs environment-specific verification
 - use [`TESTING.md`](TESTING.md) and [`tests/manual-test-cases.md`](tests/manual-test-cases.md) to test the skill itself
 - use [`MIGRATION-v1-to-v2.md`](MIGRATION-v1-to-v2.md) when adapting older skill usage
 

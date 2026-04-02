@@ -8,7 +8,7 @@ Keep these files aligned:
 - [`EXAMPLES.md`](EXAMPLES.md): compact usage scenarios
 - [`CHANGELOG.md`](CHANGELOG.md): release-level summary of behavior changes
 - [`.env.example`](.env.example): example configuration contract
-- [`docs/principles.md`](docs/principles.md): compact statement of the repo's engineering stance
+- [`docs/stance.md`](docs/stance.md): compact statement of the repo's engineering stance
 - [`docs/release-checklist.md`](docs/release-checklist.md): pre-release quality gate for maintainers
 
 ## When to update what
@@ -37,7 +37,7 @@ Keep these files aligned:
 - a release changes the skill’s generated guidance or default engineering stance
 - a new support document materially changes how users should navigate or apply the repo
 
-### Update `docs/principles.md` when
+### Update `docs/stance.md` when
 - the repo’s engineering stance changes materially
 - core expectations around checkpointing, observability, testing, or reliability change
 
@@ -48,7 +48,7 @@ Keep these files aligned:
 ## Reading order for maintainers
 
 1. [`MAINTAINERS.md`](MAINTAINERS.md)
-2. [`docs/principles.md`](docs/principles.md)
+2. [`docs/stance.md`](docs/stance.md)
 3. [`docs/release-checklist.md`](docs/release-checklist.md)
 4. [`CHANGELOG.md`](CHANGELOG.md)
 5. [`SKILL.md`](SKILL.md)
@@ -57,7 +57,7 @@ Keep these files aligned:
 
 ## Maintainer release workflow
 
-1. Review [`docs/principles.md`](docs/principles.md) to confirm the intended stance still holds
+1. Review [`docs/stance.md`](docs/stance.md) to confirm the intended stance still holds
 2. Review [`docs/release-checklist.md`](docs/release-checklist.md)
 3. Confirm `README.md`, `SKILL.md`, and `EXAMPLES.md` remain aligned
 4. Update `CHANGELOG.md` for any user-visible guidance change
@@ -72,7 +72,7 @@ Before publishing a change, verify:
 - config examples match the documented contract
 - new guidance still works for both small and production-grade integrations
 - observability, checkpointing, and testing guidance remain explicit
-- [`docs/principles.md`](docs/principles.md) still matches the repo’s current stance
+- [`docs/stance.md`](docs/stance.md) still matches the repo’s current stance
 - [`docs/release-checklist.md`](docs/release-checklist.md) has been reviewed for the release
 
 ## Editing philosophy

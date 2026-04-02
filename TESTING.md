@@ -76,9 +76,9 @@ This layer matters most because it validates the skill as a usable product, not 
 
 1. Run prompts from [`tests/manual-test-cases.md`](tests/manual-test-cases.md)
 2. Evaluate answers using:
-   - [`docs/review-checklist.md`](docs/review-checklist.md)
+   - [`docs/reviewing.md`](docs/reviewing.md)
    - [`docs/anti-patterns.md`](docs/anti-patterns.md)
-   - [`docs/guarantees-vs-assumptions.md`](docs/guarantees-vs-assumptions.md)
+   - [`docs/stance.md`](docs/stance.md)
 3. Record whether the skill:
    - triggered correctly
    - produced the expected guidance
@@ -162,7 +162,7 @@ Use this for fast activation-only testing without full scoring:
 
 Before publishing significant skill changes:
 - run the golden prompts in [`tests/manual-test-cases.md`](tests/manual-test-cases.md)
-- review outputs using [`docs/review-workflow.md`](docs/review-workflow.md)
+- review outputs using [`docs/reviewing.md`](docs/reviewing.md)
 - confirm no regression in checkpointing, idempotency, observability, or testing guidance
 - update [`CHANGELOG.md`](CHANGELOG.md) if skill behavior changed materially
 

@@ -4,60 +4,34 @@ This folder contains focused support documentation for the Odoo integration skil
 
 ## Contents
 
-- [`operability.md`](operability.md)
-  - checkpointing patterns
-  - sink selection guidance
-  - observability checklist
-- [`glossary.md`](glossary.md)
-  - key concepts such as checkpoint, idempotency, replay, and sync mode
-- [`review-checklist.md`](review-checklist.md)
-  - compact review checklist for generated integrations
-- [`decision-tree.md`](decision-tree.md)
-  - choose sync mode and sink based on the use case
-- [`FAQ.md`](FAQ.md)
-  - recurring questions about checkpoints, XML-RPC, Sheets, and runtime expectations
-- [`principles.md`](principles.md)
-  - summary of the repo's engineering stance
-- [`release-checklist.md`](release-checklist.md)
-  - maintainer checklist before publishing changes
-- [`prompt-templates.md`](prompt-templates.md)
-  - safer prompt shapes for common Odoo integration tasks
-- [`anti-patterns.md`](anti-patterns.md)
-  - common failure modes and why they fail
-- [`guarantees-vs-assumptions.md`](guarantees-vs-assumptions.md)
-  - what the skill strongly guides vs what must still be verified
-- [`review-workflow.md`](review-workflow.md)
-  - practical review flow combining checklist, anti-patterns, and guarantees
-- [`../TESTING.md`](../TESTING.md)
-  - how to test the skill using golden prompts and a review rubric
-- [`../tests/manual-test-cases.md`](../tests/manual-test-cases.md)
-  - manual golden prompt regression suite
-- [`../tests/results-template.md`](../tests/results-template.md)
-  - template for recording test results consistently
-- [`../tests/results/`](../tests/results/)
-  - example scored outputs from prompt regression runs
+- [`operability.md`](operability.md) — checkpointing patterns, sink selection, observability checklist
+- [`concepts.md`](concepts.md) — glossary of key terms and frequently asked questions
+- [`reviewing.md`](reviewing.md) — review workflow and checklist for generated integrations
+- [`decision-tree.md`](decision-tree.md) — choose sync mode and sink based on the use case
+- [`stance.md`](stance.md) — engineering principles, guarantees vs assumptions
+- [`prompt-templates.md`](prompt-templates.md) — safer prompt shapes for common Odoo tasks
+- [`anti-patterns.md`](anti-patterns.md) — common failure modes and why they fail
+- [`release-checklist.md`](release-checklist.md) — maintainer checklist before publishing changes
+
+## Testing
+
+- [`../TESTING.md`](../TESTING.md) — how to test the skill using golden prompts and a review rubric
+- [`../tests/manual-test-cases.md`](../tests/manual-test-cases.md) — manual golden prompt regression suite
+- [`../tests/results-template.md`](../tests/results-template.md) — template for recording test results
+- [`../tests/results/`](../tests/results/) — example scored outputs
 
 ## Related top-level docs
 
-- [`../README.md`](../README.md)
-  - onboarding and quick start
-- [`../SKILL.md`](../SKILL.md)
-  - canonical skill behavior and engineering defaults
-- [`../EXAMPLES.md`](../EXAMPLES.md)
-  - compact example scenarios
-- [`../MIGRATION-v1-to-v2.md`](../MIGRATION-v1-to-v2.md)
-  - migration guidance from the old skill posture
-- [`../MAINTAINERS.md`](../MAINTAINERS.md)
-  - maintainer alignment rules
-- [`../CONTRIBUTING.md`](../CONTRIBUTING.md)
-  - contributor expectations and review checklist
+- [`../README.md`](../README.md) — onboarding and quick start
+- [`../SKILL.md`](../SKILL.md) — canonical skill behavior and engineering defaults
+- [`../EXAMPLES.md`](../EXAMPLES.md) — compact example scenarios
+- [`../MIGRATION-v1-to-v2.md`](../MIGRATION-v1-to-v2.md) — migration guidance from the old skill posture
+- [`../MAINTAINERS.md`](../MAINTAINERS.md) — maintainer alignment rules
+- [`../CONTRIBUTING.md`](../CONTRIBUTING.md) — contributor expectations and review checklist
 
-## How to use this docs folder
+## Reading paths
 
-Use these docs when you want a more focused explanation than the README provides, without reading the entire skill definition.
-
-Suggested reading paths:
-- New user: [`../README.md`](../README.md) → [`glossary.md`](glossary.md) → [`decision-tree.md`](decision-tree.md) → [`operability.md`](operability.md)
-- Reviewer: [`review-workflow.md`](review-workflow.md) → [`review-checklist.md`](review-checklist.md) → [`guarantees-vs-assumptions.md`](guarantees-vs-assumptions.md) → [`anti-patterns.md`](anti-patterns.md)
-- Maintainer: [`principles.md`](principles.md) → [`release-checklist.md`](release-checklist.md) → [`../MAINTAINERS.md`](../MAINTAINERS.md)
+- New user: [`../README.md`](../README.md) → [`concepts.md`](concepts.md) → [`decision-tree.md`](decision-tree.md) → [`operability.md`](operability.md)
+- Reviewer: [`reviewing.md`](reviewing.md) → [`stance.md`](stance.md) → [`anti-patterns.md`](anti-patterns.md)
+- Maintainer: [`stance.md`](stance.md) → [`release-checklist.md`](release-checklist.md) → [`../MAINTAINERS.md`](../MAINTAINERS.md)
 - Migrating user: [`../MIGRATION-v1-to-v2.md`](../MIGRATION-v1-to-v2.md) → [`operability.md`](operability.md)
