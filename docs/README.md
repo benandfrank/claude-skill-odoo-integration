@@ -28,6 +28,14 @@ This folder contains focused support documentation for the Odoo integration skil
   - what the skill strongly guides vs what must still be verified
 - [`review-workflow.md`](review-workflow.md)
   - practical review flow combining checklist, anti-patterns, and guarantees
+- [`../TESTING.md`](../TESTING.md)
+  - how to test the skill using golden prompts and a review rubric
+- [`../tests/manual-test-cases.md`](../tests/manual-test-cases.md)
+  - manual golden prompt regression suite
+- [`../tests/results-template.md`](../tests/results-template.md)
+  - template for recording test results consistently
+- [`../tests/results/`](../tests/results/)
+  - example scored outputs from prompt regression runs
 
 ## Related top-level docs
 

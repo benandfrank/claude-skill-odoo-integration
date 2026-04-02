@@ -29,6 +29,7 @@ For supporting material and compact usage examples, also see:
 - [`docs/prompt-templates.md`](docs/prompt-templates.md)
 - [`docs/anti-patterns.md`](docs/anti-patterns.md)
 - [`docs/guarantees-vs-assumptions.md`](docs/guarantees-vs-assumptions.md)
+- [`TESTING.md`](TESTING.md)
 - [`MIGRATION-v1-to-v2.md`](MIGRATION-v1-to-v2.md)
 
 ## Docs map
@@ -42,6 +43,7 @@ Use the repo docs like this:
 - use [`docs/prompt-templates.md`](docs/prompt-templates.md) for safer prompt shapes
 - use [`docs/anti-patterns.md`](docs/anti-patterns.md) for common failure modes
 - use [`docs/guarantees-vs-assumptions.md`](docs/guarantees-vs-assumptions.md) to understand guidance vs environment-specific verification
+- use [`TESTING.md`](TESTING.md) and [`tests/manual-test-cases.md`](tests/manual-test-cases.md) to test the skill itself
 - use [`MIGRATION-v1-to-v2.md`](MIGRATION-v1-to-v2.md) when adapting older skill usage
 
 ---

@@ -52,6 +52,8 @@ Keep these files aligned:
 3. [`docs/release-checklist.md`](docs/release-checklist.md)
 4. [`CHANGELOG.md`](CHANGELOG.md)
 5. [`SKILL.md`](SKILL.md)
+6. [`TESTING.md`](TESTING.md)
+7. [`tests/manual-test-cases.md`](tests/manual-test-cases.md)
 
 ## Maintainer release workflow
 
@@ -59,7 +61,8 @@ Keep these files aligned:
 2. Review [`docs/release-checklist.md`](docs/release-checklist.md)
 3. Confirm `README.md`, `SKILL.md`, and `EXAMPLES.md` remain aligned
 4. Update `CHANGELOG.md` for any user-visible guidance change
-5. Verify new support docs are linked from the right places
+5. Run or review the golden prompt suite in [`tests/manual-test-cases.md`](tests/manual-test-cases.md)
+6. Verify new support docs are linked from the right places
 
 ## Review checklist for maintainers
 

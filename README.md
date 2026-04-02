@@ -272,6 +272,9 @@ For more detailed patterns, see:
 - [`docs/principles.md`](docs/principles.md)
 - [`docs/release-checklist.md`](docs/release-checklist.md)
 - [`docs/guarantees-vs-assumptions.md`](docs/guarantees-vs-assumptions.md)
+- [`TESTING.md`](TESTING.md)
+- [`tests/manual-test-cases.md`](tests/manual-test-cases.md)
+- [`tests/results-template.md`](tests/results-template.md)
 - [`MIGRATION-v1-to-v2.md`](MIGRATION-v1-to-v2.md)
 
 ---
