@@ -1,726 +1,885 @@
 ---
 name: odoo-integration
-version: "1.0.0"
-description: "Use this skill when the user needs to connect to Odoo via XML-RPC, sync Odoo data to external systems (Google Sheets, databases, APIs), read or write Odoo models (stock.picking, sale.order, purchase.order, product.product, etc.), set up cron-based sync jobs, or deploy Odoo integrations on Railway/Render/Fly.io. Also use when the user mentions albaranes, pedidos, stock, ERP sync, or Odoo automation. Do NOT trigger for generic REST API tasks or non-Odoo ERP systems."
+version: "2.0.0"
+description: "Use this skill when the user needs to integrate with Odoo safely and observably: reading or writing Odoo models, synchronizing Odoo data to external systems, designing cron or worker-based sync jobs, handling Odoo XML-RPC or version-aware API access, or deploying reliable Odoo integrations. Also use when the user mentions stock.picking, sale.order, purchase.order, albaranes, pedidos, ERP sync, Odoo automation, reconciliation, checkpointing, or idempotent exports. Do NOT trigger for generic REST API tasks or non-Odoo ERP systems."
 license: MIT. See LICENSE.txt
 ---
 
 # Odoo Integration Skill
 
-You are an expert in Odoo XML-RPC integrations using Node.js. You know the quirks of Odoo v8 through v17, the exact XML-RPC endpoint structure, key model names and their states, and how to sync data reliably to external systems.
+You are an expert in Odoo integrations and operationally safe sync design.
+
+You know how to integrate with Odoo using XML-RPC and version-aware access patterns across Odoo v8 through v17+. You design integrations that are:
+
+- small and testable
+- observable in runtime
+- idempotent by design
+- resilient to transient failures
+- explicit about checkpointing and replay
+- aligned with domain language, not only transport details
+
+You do not default to fragile script patterns when the use case implies production reliability, auditability, or scale.
+
+For supporting material and compact usage examples, also see:
+- [`README.md`](README.md)
+- [`EXAMPLES.md`](EXAMPLES.md)
+- [`docs/operability.md`](docs/operability.md)
+- [`docs/decision-tree.md`](docs/decision-tree.md)
+- [`docs/FAQ.md`](docs/FAQ.md)
+- [`docs/prompt-templates.md`](docs/prompt-templates.md)
+- [`docs/anti-patterns.md`](docs/anti-patterns.md)
+- [`docs/guarantees-vs-assumptions.md`](docs/guarantees-vs-assumptions.md)
+- [`MIGRATION-v1-to-v2.md`](MIGRATION-v1-to-v2.md)
+
+## Docs map
+
+Use the repo docs like this:
+- start with [`README.md`](README.md) for positioning, quick start, and reading order
+- use [`EXAMPLES.md`](EXAMPLES.md) for concrete scenarios
+- use [`docs/operability.md`](docs/operability.md) for runtime guidance
+- use [`docs/decision-tree.md`](docs/decision-tree.md) for sink and sync-mode selection
+- use [`docs/FAQ.md`](docs/FAQ.md) for recurring questions
+- use [`docs/prompt-templates.md`](docs/prompt-templates.md) for safer prompt shapes
+- use [`docs/anti-patterns.md`](docs/anti-patterns.md) for common failure modes
+- use [`docs/guarantees-vs-assumptions.md`](docs/guarantees-vs-assumptions.md) to understand guidance vs environment-specific verification
+- use [`MIGRATION-v1-to-v2.md`](MIGRATION-v1-to-v2.md) when adapting older skill usage
 
 ---
 
-## Core Architecture
+## Operating Principles
 
-Every Odoo integration follows this structure:
+For every Odoo integration:
 
-```
+1. Define the business intent first
+   - What job is the integration doing?
+   - Is it append-only reporting, upsert sync, reconciliation, or command/write-back?
+
+2. Make the sync contract explicit
+   - source model
+   - selection criteria
+   - sync mode
+   - checkpoint field
+   - idempotency key
+   - replay behavior
+   - failure behavior
+
+3. Separate concerns
+   - transport/access to Odoo
+   - domain mapping and rules
+   - checkpoint persistence
+   - output sink
+   - scheduling/orchestration
+   - observability
+
+4. If it is not observable in runtime, it is not complete
+
+5. Prefer at-least-once processing with an idempotent sink unless stronger guarantees are truly implemented
+
+---
+
+## Recommended Architecture
+
+Do not put business logic directly inside transport clients or cron callbacks.
+
+Prefer this structure:
+
+```text
 odoo-sync/
-├── index.js              # Entry point + cron scheduler
-├── config/
-│   └── odoo.js           # OdooClient class (XML-RPC)
-├── utils/
-│   ├── sync.js           # SyncManager (business logic)
-│   └── sheets.js         # Output client (Sheets, DB, etc.)
-├── test-odoo.js          # Test raw Odoo connection
-├── test-sync.js          # Test full sync pipeline
-├── debug-states.js       # Inspect model states in prod
-├── .env                  # Credentials (never commit)
-├── Procfile              # Railway: "web: node index.js"
+├── src/
+│   ├── app/
+│   │   └── run-sync.js
+│   ├── domain/
+│   │   ├── sync-policy.js
+│   │   ├── mapping.js
+│   │   ├── invariants.js
+│   │   └── queries/
+│   ├── ports/
+│   │   ├── odoo-gateway.js
+│   │   ├── checkpoint-store.js
+│   │   ├── output-sink.js
+│   │   └── run-lock.js
+│   ├── adapters/
+│   │   ├── odoo/xmlrpc-client.js
+│   │   ├── checkpoint/sqlite.js
+│   │   ├── checkpoint/postgres.js
+│   │   ├── sink/google-sheets.js
+│   │   └── observability/logger.js
+│   ├── config/
+│   │   └── env.js
+│   └── main.js
+├── tests/
+├── scripts/
+├── .env.example
+├── Procfile
 └── package.json
 ```
 
+### Responsibility boundaries
+
+- `app/run-sync.js`
+  - orchestration only
+- `domain/*`
+  - business terms, mappings, query builders, invariants
+- `ports/*`
+  - capability contracts
+- `adapters/*`
+  - concrete implementations
+- `config/env.js`
+  - config parsing and validation
+- `scripts/*`
+  - diagnostics, exploration, replay, support
+
+This structure is preferred because it is:
+
+- **Composable**
+- **Predictable**
+- **Testable**
+- **Operationally clearer**
+
 ---
 
-## OdooClient — XML-RPC Base Class
+## Sync Contract — define this before coding
 
-Always use this class as the foundation. Never call xmlrpc directly from business logic.
+Every integration should define a sync contract like this:
+
+```js
+const syncPolicy = {
+  name: 'stock-picking-awaiting-availability',
+  sourceModel: 'stock.picking',
+  mode: 'append', // append | upsert | snapshot | reconcile
+  checkpoint: {
+    field: 'write_date',
+    order: ['write_date asc', 'id asc'],
+  },
+  identity: {
+    sourceIdField: 'id',
+    idempotencyKey: 'id',
+  },
+  selection: {
+    states: ['waiting', 'confirmed'],
+  },
+  sink: {
+    type: 'google-sheets',
+  },
+};
+```
+
+### Preferred defaults
+
+- checkpoint field: `write_date`
+- deterministic ordering: `write_date asc, id asc`
+- sink writes: idempotent if possible
+- checkpoint commit: only after successful durable sink write
+
+### Avoid
+
+- using `date` as a checkpoint unless the business case truly requires it
+- using the sink as the authoritative checkpoint store
+- parsing human display fields such as `origin` as primary relational identifiers
+
+---
+
+## Odoo Access Layer
+
+Always encapsulate Odoo access behind a gateway. Do not scatter raw XML-RPC calls through business logic.
+
+### Required gateway capabilities
+
+- authenticate
+- search
+- read
+- search_read
+- create
+- write
+- paginated fetch
+- field existence checks
+- optional context support
+- timeout and retry policy for safe transient failures
+
+### Example shape
 
 ```javascript
-// config/odoo.js
-const xmlrpc = require('xmlrpc');
+// ports/odoo-gateway.js
+class OdooGateway {
+  async authenticate() {}
+  async search(model, domain, options = {}) {}
+  async read(model, ids, fields = [], options = {}) {}
+  async searchRead(model, domain, fields = [], options = {}) {}
+  async create(model, values, options = {}) {}
+  async write(model, ids, values, options = {}) {}
+  async fieldsGet(model, attributes = []) {}
+}
+```
 
-class OdooClient {
-  constructor(config = {}) {
-    this.host     = config.host     || process.env.ODOO_HOST;
-    this.database = config.database || process.env.ODOO_DATABASE;
-    this.login    = config.login    || process.env.ODOO_LOGIN;
-    this.password = config.password || process.env.ODOO_PASSWORD;
-    this.port     = config.port     || 443;
-    this.uid      = null;
-    this.authenticated = false;
+### XML-RPC adapter guidelines
 
-    const clientConfig = { host: this.host, port: this.port };
+- Support both HTTP and HTTPS by config
+- Validate environment variables at startup
+- Add request timeout
+- Retry only transient transport errors
+- Never blindly retry writes unless the operation is proven idempotent
+- Support page iteration for large result sets
 
-    this.commonClient = xmlrpc.createSecureClient({
-      ...clientConfig, path: '/xmlrpc/2/common'
-    });
-    this.objectClient = xmlrpc.createSecureClient({
-      ...clientConfig, path: '/xmlrpc/2/object'
-    });
+### Configuration notes
+
+Odoo instances vary by:
+- version
+- custom modules
+- enabled models/fields
+- company and warehouse context
+- user access rights
+
+Always verify fields in the target instance when correctness depends on them.
+
+---
+
+## Odoo Domain Knowledge
+
+Use domain language, not only raw strings.
+
+### `stock.picking`
+Business meaning:
+- delivery order / transfer / warehouse operation
+
+Common states:
+- `draft`
+- `waiting`
+- `confirmed`
+- `assigned`
+- `done`
+- `cancel`
+
+Typical reporting use case:
+- pending outbound operations waiting for availability
+
+Caveats:
+- fields vary by version and customization
+- `move_lines` vs `move_ids` depends on version/use case
+- `origin` is a display/business field, not a stable relationship contract
+- prefer relational fields if available
+
+### `stock.move`
+Business meaning:
+- inventory movement line
+
+Caveats:
+- state meaning is operational and can vary with workflows
+- quantities may reflect reservation or execution state depending on field used
+
+### `sale.order`
+Business meaning:
+- sales order lifecycle
+
+Caveats:
+- state alone may not express fulfillment/invoicing status
+- linkages to pickings/invoices should be validated in the target instance
+
+### `purchase.order`
+Business meaning:
+- purchasing lifecycle and inbound dependencies
+
+### `product.product` and `product.template`
+Business meaning:
+- variant vs template
+
+Important warning:
+- stock fields such as `qty_available` are context-sensitive
+- company, location, warehouse, and reservation context matter
+- do not assume `qty_available` is the business answer without clarifying context
+
+### `res.partner`
+Business meaning:
+- customer/vendor/contact entity
+
+Important warning:
+- data quality often varies significantly in production instances
+- missing emails, duplicate names, and multi-address patterns are common
+
+---
+
+## Version Compatibility Rules
+
+The XML-RPC protocol is broadly stable across Odoo versions, but models and fields differ.
+
+Known examples:
+
+| Concept | Older versions | Newer versions | Safe approach |
+|--------|----------------|----------------|---------------|
+| picking move fields | `move_lines` | `move_ids` | detect and fallback |
+| scheduled date | `min_date` | `scheduled_date` | detect and fallback |
+| invoice model | `account.invoice` | `account.move` | ask version or introspect |
+| detailed ops | varies | `move_line_ids` | verify before use |
+
+### Safe compatibility pattern
+
+```javascript
+const moveIds = picking.move_ids || picking.move_lines || [];
+const scheduledDate = picking.scheduled_date || picking.min_date || null;
+```
+
+When the version is unknown:
+- use safe fallbacks
+- add comments
+- verify fields exist before depending on them
+
+---
+
+## Query and Mapping Guidance
+
+Avoid stringly-typed logic scattered across the codebase.
+
+Prefer:
+- query builders
+- field constants
+- state constants
+- mapping helpers
+
+Example:
+
+```javascript
+const PickingStates = {
+  WAITING: 'waiting',
+  CONFIRMED: 'confirmed',
+};
+
+function buildPendingPickingDomain(checkpoint) {
+  const domain = [['state', 'in', [PickingStates.WAITING, PickingStates.CONFIRMED]]];
+  if (checkpoint?.writeDate) {
+    domain.push(['write_date', '>=', checkpoint.writeDate]);
   }
+  return domain;
+}
+```
 
-  async authenticate() {
-    return new Promise((resolve, reject) => {
-      this.commonClient.methodCall(
-        'authenticate',
-        [this.database, this.login, this.password, {}],
-        (error, uid) => {
-          if (error || !uid) {
-            reject(error || new Error('Authentication failed — check credentials and database name'));
-            return;
-          }
-          this.uid = uid;
-          this.authenticated = true;
-          resolve(uid);
+This improves:
+- readability
+- testability
+- refactoring safety
+- domain alignment
+
+---
+
+## Sync Run Flow
+
+Use a deterministic run flow.
+
+### Recommended steps
+
+1. Validate configuration
+2. Acquire run lock
+3. Load checkpoint
+4. Fetch source records in stable order
+5. Validate and map records
+6. Write to sink using explicit mode
+7. Commit checkpoint only after successful sink write
+8. Emit run summary metrics/logs
+9. Release lock
+
+### Example orchestration outline
+
+```javascript
+async function runSync({ odoo, sink, checkpointStore, runLock, logger }) {
+  const runId = crypto.randomUUID();
+
+  logger.info({ runId }, 'sync.start');
+
+  await runLock.acquire();
+
+  try {
+    const checkpoint = await checkpointStore.load();
+    const pages = await fetchDeterministicPages({ odoo, checkpoint });
+
+    let processed = 0;
+    let written = 0;
+    let failed = 0;
+    let nextCheckpoint = checkpoint;
+
+    for (const page of pages) {
+      const mapped = [];
+      for (const record of page.records) {
+        try {
+          mapped.push(mapRecord(record));
+          nextCheckpoint = advanceCheckpoint(nextCheckpoint, record);
+          processed++;
+        } catch (error) {
+          failed++;
+          logger.warn({ runId, error, sourceId: record.id }, 'sync.record_mapping_failed');
         }
-      );
-    });
-  }
+      }
 
-  async searchRead(model, domain = [], fields = [], options = {}) {
-    if (!this.authenticated) throw new Error('Call authenticate() first');
-    return new Promise((resolve, reject) => {
-      this.objectClient.methodCall('execute_kw', [
-        this.database, this.uid, this.password,
-        model, 'search_read', [domain],
-        {
-          fields: fields.length > 0 ? fields : ['id', 'name'],
-          limit: options.limit || 100,
-          order: options.order || 'id desc',
-          offset: options.offset || 0,
-        }
-      ], (error, result) => {
-        if (error) reject(error);
-        else resolve(result || []);
-      });
-    });
-  }
+      const result = await sink.write(mapped);
+      written += result.writtenCount;
 
-  async read(model, id, fields = []) {
-    if (!this.authenticated) throw new Error('Call authenticate() first');
-    return new Promise((resolve, reject) => {
-      this.objectClient.methodCall('execute_kw', [
-        this.database, this.uid, this.password,
-        model, 'read', [[id]],
-        { fields: fields.length > 0 ? fields : [] }
-      ], (error, result) => {
-        if (error) reject(error);
-        else resolve(result && result.length > 0 ? result[0] : null);
-      });
-    });
-  }
-
-  async create(model, values) {
-    if (!this.authenticated) throw new Error('Call authenticate() first');
-    return new Promise((resolve, reject) => {
-      this.objectClient.methodCall('execute_kw', [
-        this.database, this.uid, this.password,
-        model, 'create', [values]
-      ], (error, result) => {
-        if (error) reject(error);
-        else resolve(result); // returns new record ID
-      });
-    });
-  }
-
-  async write(model, ids, values) {
-    if (!this.authenticated) throw new Error('Call authenticate() first');
-    return new Promise((resolve, reject) => {
-      this.objectClient.methodCall('execute_kw', [
-        this.database, this.uid, this.password,
-        model, 'write', [ids, values]
-      ], (error, result) => {
-        if (error) reject(error);
-        else resolve(result); // returns true
-      });
-    });
-  }
-
-  async search(model, domain = [], options = {}) {
-    if (!this.authenticated) throw new Error('Call authenticate() first');
-    return new Promise((resolve, reject) => {
-      this.objectClient.methodCall('execute_kw', [
-        this.database, this.uid, this.password,
-        model, 'search', [domain],
-        { limit: options.limit || 100 }
-      ], (error, result) => {
-        if (error) reject(error);
-        else resolve(result || []); // returns array of IDs
-      });
-    });
-  }
-}
-
-module.exports = OdooClient;
-```
-
----
-
-## Key Odoo Models
-
-### stock.picking — Albaranes (Delivery/Transfer Orders)
-
-**States:**
-| Value | Label |
-|-------|-------|
-| `draft` | Borrador |
-| `waiting` | En espera (waiting for another operation) |
-| `confirmed` | Esperando disponibilidad (waiting for stock) |
-| `assigned` | Listo para transferir |
-| `done` | Hecho |
-| `cancel` | Cancelado |
-
-**Key fields:**
-```javascript
-['id', 'name', 'state', 'date', 'move_lines', 'origin',
- 'partner_id', 'picking_type_id', 'scheduled_date']
-```
-
-**Typical domain — "Esperando Disponibilidad":**
-```javascript
-[['state', 'in', ['waiting', 'confirmed']]]
-```
-
-**Note on `origin` field:** Contains the procurement group reference, e.g. `"WH/OUT/259023: Sale Order SO-1234"`. To extract the group ID: `origin.split(':')[0].trim()`.
-
----
-
-### stock.move — Líneas de movimiento
-
-**States:**
-| Value | Label |
-|-------|-------|
-| `draft` | Nuevo |
-| `waiting` | En espera (waiting for move) |
-| `confirmed` | Esperando disponibilidad |
-| `assigned` | Disponible |
-| `done` | Hecho |
-| `cancel` | Cancelado |
-
-**Key fields:**
-```javascript
-['id', 'product_id', 'state', 'product_uom_qty',
- 'quantity_done', 'name', 'picking_id']
-```
-
-**To get lines for a picking:**
-```javascript
-const moveLines = await odoo.searchRead(
-  'stock.move',
-  [['id', 'in', picking.move_lines]],
-  ['id', 'product_id', 'state', 'product_uom_qty', 'name']
-);
-// Filter by state:
-const waitingLines = moveLines.filter(l => l.state === 'confirmed');
-```
-
-**Product name cleanup (remove SKU codes like `[SKU-123]`):**
-```javascript
-const cleanName = product.replace(/^\s*\[.*?\]\s*/, '').trim();
-```
-
----
-
-### sale.order — Pedidos de Venta
-
-**States:**
-| Value | Label |
-|-------|-------|
-| `draft` | Presupuesto |
-| `sent` | Presupuesto enviado |
-| `sale` | Pedido de venta |
-| `done` | Bloqueado |
-| `cancel` | Cancelado |
-
-**Key fields:**
-```javascript
-['id', 'name', 'state', 'date_order', 'partner_id',
- 'amount_total', 'order_line', 'picking_ids']
-```
-
----
-
-### purchase.order — Pedidos de Compra
-
-**States:** `draft`, `sent`, `to approve`, `purchase`, `done`, `cancel`
-
-**Key fields:**
-```javascript
-['id', 'name', 'state', 'date_order', 'partner_id',
- 'amount_total', 'order_line', 'picking_ids']
-```
-
----
-
-### product.product / product.template
-
-```javascript
-// product.product = variant (has stock)
-// product.template = template (groups variants)
-const products = await odoo.searchRead(
-  'product.product',
-  [['active', '=', true]],
-  ['id', 'name', 'default_code', 'list_price', 'qty_available']
-);
-```
-
----
-
-### res.partner — Clientes/Proveedores
-
-```javascript
-['id', 'name', 'email', 'phone', 'street', 'city',
- 'country_id', 'customer_rank', 'supplier_rank']
-```
-
----
-
-## SyncManager — Incremental Sync with Deduplication
-
-The canonical pattern for reliable, idempotent syncs:
-
-```javascript
-// utils/sync.js
-class SyncManager {
-  constructor() {
-    this.odoo   = new OdooClient();
-    this.output = new OutputClient(); // Sheets, DB, etc.
-  }
-
-  async sync() {
-    await this.odoo.authenticate();
-    await this.output.authenticate();
-
-    // 1. Load already-synced keys (deduplication)
-    const existingKeys = await this.output.getExistingKeys();
-
-    // 2. Get last synced date (incremental — avoids full scans)
-    const lastDate = await this.output.getLastDate();
-
-    // 3. Build domain dynamically
-    const domain = [['state', 'in', ['waiting', 'confirmed']]];
-    if (lastDate) {
-      domain.push(['date', '>=', lastDate]);
+      await checkpointStore.save(nextCheckpoint);
     }
 
-    // 4. Fetch from Odoo
-    const records = await this.odoo.searchRead(
-      'stock.picking', domain,
-      ['id', 'name', 'state', 'date', 'move_lines', 'origin'],
-      { limit: 1000, order: 'date asc' }
-    );
-
-    // 5. Process and deduplicate
-    const rows = [];
-    for (const record of records) {
-      const key = extractKey(record); // e.g. procurement group
-      if (existingKeys.has(key)) continue;
-
-      const detail = await this.odoo.read(
-        'stock.picking', record.id,
-        ['id', 'name', 'date', 'move_lines', 'origin']
-      );
-      if (!detail) continue;
-
-      // ... build rows ...
-      rows.push(buildRow(detail));
-    }
-
-    // 6. Write output
-    if (rows.length > 0) {
-      await this.output.appendRows(rows);
-    }
-
-    return { success: true, rowsAdded: rows.length };
+    logger.info({ runId, processed, written, failed }, 'sync.success');
+  } finally {
+    await runLock.release();
   }
 }
 ```
 
----
+### Invariants
 
-## Google Sheets Output Client
-
-```javascript
-// utils/sheets.js
-const { google } = require('googleapis');
-
-class SheetsClient {
-  constructor() {
-    this.spreadsheetId = process.env.GOOGLE_SHEETS_ID;
-    this.sheetName     = process.env.GOOGLE_SHEET_NAME || 'Hoja1';
-    this.sheets        = null;
-  }
-
-  async authenticate() {
-    // Supports both: local credentials.json file OR GOOGLE_CREDENTIALS env var (Railway)
-    let auth;
-    if (process.env.GOOGLE_CREDENTIALS) {
-      const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS);
-      auth = new google.auth.GoogleAuth({
-        credentials,
-        scopes: ['https://www.googleapis.com/auth/spreadsheets']
-      });
-    } else {
-      auth = new google.auth.GoogleAuth({
-        keyFile: './credentials.json',
-        scopes: ['https://www.googleapis.com/auth/spreadsheets']
-      });
-    }
-    this.sheets = google.sheets({ version: 'v4', auth });
-  }
-
-  async appendRows(rows) {
-    // Read column A to find true last row (works even with active filters)
-    const col = await this.sheets.spreadsheets.values.get({
-      spreadsheetId: this.spreadsheetId,
-      range: `${this.sheetName}!A:A`
-    });
-    const lastRow = (col.data.values || []).length;
-    const range   = `${this.sheetName}!A${lastRow + 1}:Z${lastRow + rows.length}`;
-
-    await this.sheets.spreadsheets.values.update({
-      spreadsheetId: this.spreadsheetId,
-      range,
-      valueInputOption: 'RAW',
-      resource: { values: rows }
-    });
-  }
-
-  async getExistingKeys() {
-    // Column B = deduplication key (e.g. procurement group)
-    const data = await this._readColumn('B');
-    const keys = new Set();
-    data.slice(1).forEach(row => { if (row[0]) keys.add(row[0].toString()); });
-    return keys;
-  }
-
-  async getLastDate() {
-    // Column A = date. Walk backwards for last non-empty value.
-    const data = await this._readColumn('A');
-    for (let i = data.length - 1; i >= 1; i--) {
-      if (data[i] && data[i][0]) return data[i][0];
-    }
-    return null;
-  }
-
-  async _readColumn(col) {
-    const res = await this.sheets.spreadsheets.values.get({
-      spreadsheetId: this.spreadsheetId,
-      range: `${this.sheetName}!${col}:${col}`
-    });
-    return res.data.values || [];
-  }
-}
-
-module.exports = SheetsClient;
-```
+- No overlapping runs
+- No checkpoint advance without durable sink success
+- No silent record drops
+- Failed records are counted and logged
+- Runtime behavior is measurable
 
 ---
 
-## Cron Scheduler (index.js)
+## Output Sinks
 
-```javascript
-const cron = require('node-cron');
-const SyncManager = require('./utils/sync');
+Treat sinks as outputs, not as your control plane.
 
-const syncManager = new SyncManager();
+### Recommended sink categories
 
-// Run on start
-(async () => {
-  console.log('Running initial sync...');
-  await syncManager.sync();
-})();
+- Reporting sink
+  - Google Sheets
+  - CSV
+  - BI-friendly tables
+- System-of-record sink
+  - Postgres
+  - warehouse
+  - integration database
+- Command sink
+  - API write
+  - message queue
+  - downstream transactional system
 
-// Schedule: every 15 min, Mon-Fri, 6am-10pm
-// Adjust HOURS_START / HOURS_END via env vars if needed
-const start = process.env.HOURS_START || 6;
-const end   = process.env.HOURS_END   || 22;
+### Google Sheets guidance
 
-cron.schedule(`*/15 ${start}-${end} * * 1-5`, async () => {
-  console.log(`[${new Date().toLocaleString()}] Running sync...`);
-  await syncManager.sync();
-});
+Google Sheets is appropriate for:
+- lightweight reporting
+- low-volume exports
+- human-readable operational views
 
-process.on('SIGTERM', () => process.exit(0));
-```
+Google Sheets is not ideal for:
+- checkpoint persistence
+- strong concurrency guarantees
+- high-volume syncs
+- exactly-once semantics
 
-**Cron patterns reference:**
-```
-*/15 6-22 * * *      → every 15 min, 6am–10pm, all days
-0    8-17 * * 1-5    → hourly, 8am–5pm, Mon–Fri
-30   6-15 * * *      → at :30 of each hour, 6am–3pm
-0,30 6-15 * * *      → every 30 min, 6am–3pm
-```
+If using Sheets:
+- keep checkpoint state outside the sheet
+- define an idempotency column if possible
+- expect manual edits and operational drift
+- treat the sheet as a presentation sink
 
 ---
 
-## Environment Variables
+## Scheduling and Runtime
+
+Do not put scheduling concerns inside domain logic.
+
+Preferred options:
+- platform scheduler
+- singleton worker
+- queue/worker model
+- workflow runner
+
+If in-process cron is used:
+- add overlap protection
+- add timeout budget
+- add skipped-run logging
+- add graceful shutdown
+
+### Graceful shutdown requirements
+
+- stop accepting new work
+- finish or safely abort current batch
+- do not leave checkpoint in an invalid state
+- flush logs/metrics if possible
+
+---
+
+## Configuration Contract
+
+Validate configuration at startup.
+
+### Example categories
+
+Required:
+- Odoo host
+- database
+- login
+- password
+- transport/protocol
+- sink config
+- checkpoint backend
+
+Optional:
+- page size
+- retry limits
+- scheduler config
+- log level
+- tracing/metrics toggles
+
+Suggested variables:
 
 ```env
 # Odoo
-ODOO_HOST=erp.yourcompany.com
+ODOO_HOST=erp.example.com
 ODOO_DATABASE=production_db
-ODOO_LOGIN=sync_user@company.com
-ODOO_PASSWORD=your_password
+ODOO_LOGIN=sync_user@example.com
+ODOO_PASSWORD=replace_me
+ODOO_PROTOCOL=https
 ODOO_PORT=443
 
-# Google Sheets
-GOOGLE_SHEETS_ID=1abc...xyz
-GOOGLE_SHEET_NAME=Marzo 2026
-# On Railway: paste full credentials.json content as single line
-GOOGLE_CREDENTIALS={"type":"service_account","project_id":"..."}
+# Sync
+SYNC_MODE=append
+SYNC_PAGE_SIZE=500
 
-# Scheduler
-HOURS_START=6
-HOURS_END=22
+# Checkpoint / lock
+CHECKPOINT_BACKEND=sqlite
+LOCK_BACKEND=memory
+
+# Sink
+OUTPUT_SINK=google-sheets
+GOOGLE_SHEETS_ID=sheet_id
+GOOGLE_SHEET_NAME=April 2026
+
+# Logging / telemetry
+LOG_LEVEL=info
 ```
 
-**Monthly sheet rotation:** Just change `GOOGLE_SHEET_NAME` in `.env` (or Railway env vars) at the start of each month. No code changes needed.
+### Rules
+
+- fail fast on invalid config
+- never log secrets
+- redact sensitive fields in logs
 
 ---
 
-## Railway Deployment
+## Testing Strategy
 
-**Procfile:**
-```
-web: node index.js
-```
+Debug scripts are not a substitute for tests.
 
-**package.json engines:**
-```json
-{
-  "engines": { "node": ">=18.0.0" }
-}
-```
+Use the lowest-level tests that provide confidence.
 
-**Steps:**
-1. Push to GitHub
-2. Connect repo in Railway
-3. Set env vars in Railway dashboard (Settings → Variables)
-4. For `GOOGLE_CREDENTIALS`: copy the full contents of `credentials.json`, minify to single line, paste as value
-5. Deploy — Railway auto-restarts on crash
+### Unit tests
+Use for:
+- domain builders
+- state normalization
+- mapping functions
+- checkpoint progression
+- idempotency logic
+- fallback field behavior
 
-**NEVER commit:** `.env`, `credentials.json`
+### Integration tests
+Use for:
+- Odoo gateway adapter
+- checkpoint store
+- sink behavior
+- retry and failure handling at boundaries
 
----
+### Contract tests
+Use for:
+- recorded Odoo payloads
+- version-specific field differences
+- custom field presence assumptions
 
-## Debug Scripts
+### End-to-end tests
+Use sparingly for:
+- critical sync path
+- deployment smoke validation
 
-Always include these in the project. Run them locally to diagnose production issues.
+### Minimum test scenarios
 
-### test-odoo.js — Verify raw connection
-```javascript
-require('dotenv').config();
-const OdooClient = require('./config/odoo');
-
-(async () => {
-  const odoo = new OdooClient();
-  await odoo.authenticate();
-  console.log('UID:', odoo.uid);
-
-  const pickings = await odoo.searchRead(
-    'stock.picking', [],
-    ['id', 'name', 'state', 'date'],
-    { limit: 5 }
-  );
-  console.log('Sample pickings:', JSON.stringify(pickings, null, 2));
-})();
-```
-
-### debug-states.js — Discover real state values in your instance
-```javascript
-require('dotenv').config();
-const OdooClient = require('./config/odoo');
-
-(async () => {
-  const odoo = new OdooClient();
-  await odoo.authenticate();
-
-  const records = await odoo.searchRead(
-    'stock.picking', [],
-    ['id', 'name', 'state', 'date'],
-    { limit: 100 }
-  );
-
-  const states = {};
-  records.forEach(r => {
-    if (!states[r.state]) states[r.state] = 0;
-    states[r.state]++;
-  });
-  console.log('States found:', states);
-})();
-```
-
-### debug-move-lines.js — Inspect lines inside a specific picking
-```javascript
-require('dotenv').config();
-const OdooClient = require('./config/odoo');
-
-const PICKING_ID = 1341658; // replace with target ID
-
-(async () => {
-  const odoo = new OdooClient();
-  await odoo.authenticate();
-
-  const picking = await odoo.read(
-    'stock.picking', PICKING_ID,
-    ['id', 'name', 'move_lines', 'origin']
-  );
-  console.log('Picking:', picking.name);
-
-  const lines = await odoo.searchRead(
-    'stock.move',
-    [['id', 'in', picking.move_lines]],
-    ['id', 'product_id', 'state', 'product_uom_qty', 'name']
-  );
-
-  const byState = {};
-  lines.forEach(l => {
-    if (!byState[l.state]) byState[l.state] = [];
-    byState[l.state].push(l.product_id[1] || l.name);
-  });
-  console.log('Lines by state:', JSON.stringify(byState, null, 2));
-})();
-```
+- happy path
+- duplicate source records
+- out-of-order updates
+- missing optional fields
+- incompatible field assumptions
+- transient source failure
+- transient sink failure
+- partial mapping failures
+- overlap-prevention behavior
+- checkpoint resume after interruption
 
 ---
 
-## Common Gotchas
+## Observability
 
-### Many2one fields return `[id, name]` arrays
-```javascript
-// product_id = [42, "Bike Model XR"]
-const name = line.product_id[1]; // ✅
-const id   = line.product_id[0]; // ✅
-const name = line.product_id;    // ❌ returns array, not string
-```
+An Odoo integration is incomplete without runtime observability.
 
-### Version compatibility — field name differences
+### Structured logs
+Every run should emit:
+- run ID
+- source model
+- sync policy name
+- checkpoint before/after
+- processed count
+- written count
+- skipped count
+- failed count
+- duration
+- result status
 
-The XML-RPC protocol is identical across all Odoo versions (v8–v17). Only a handful of field names changed:
+### Metrics
+At minimum:
+- sync duration
+- source fetch latency
+- sink write latency
+- record counts
+- retry counts
+- failure counts by category
+- last successful run timestamp
+- stale sync age
+- overlap prevention count
 
-| Field | v8–v12 | v13+ | Safe fallback |
-|-------|--------|-------|---------------|
-| Transfer lines | `move_lines` | `move_ids` | `picking.move_ids \|\| picking.move_lines \|\| []` |
-| Scheduled date | `min_date` | `scheduled_date` | `picking.scheduled_date \|\| picking.min_date` |
-| Detailed ops | _(not used)_ | `move_line_ids` (v14+) | check before using |
-| Invoice model | `account.invoice` | `account.move` (v13+) | ask user which version |
+### Alerts
+Consider alerts for:
+- stale sync
+- repeated failures
+- checkpoint not advancing
+- sudden drop to zero records when unexpected
+- unusually high mapping failures
 
-Always use safe fallbacks when writing code that should work across versions:
-
-```javascript
-// v8–v17 safe patterns
-const lines    = picking.move_ids      || picking.move_lines || [];
-const date     = picking.scheduled_date || picking.min_date;
-const invoice  = 'account.move'; // v13+, or 'account.invoice' for v8–v12
-```
-
-When the user mentions their Odoo version, use the exact field name. When unknown, use the safe fallback and add a comment.
-
-### `date` field format
-Odoo returns dates as `"2026-03-25 14:30:00"`. To get only the date part:
-```javascript
-const dateOnly = picking.date.split(' ')[0]; // "2026-03-25"
-```
-
-### searchRead limit
-Default limit in OdooClient is 100. For production syncs always set `limit: 1000` (or use pagination with `offset`).
-
-### Authentication returns `false` (not an error)
-When `uid === false`, credentials are wrong or the database name is incorrect. The `xmlrpc` library will NOT throw — it returns `false`. Always check `if (!uid)`.
-
-### HTTPS vs HTTP
-Most hosted Odoo instances use port 443 with HTTPS. Local/dev instances often use port 8069 with HTTP:
-```javascript
-// HTTPS (production):
-xmlrpc.createSecureClient({ host, port: 443, path })
-
-// HTTP (local dev):
-xmlrpc.createClient({ host, port: 8069, path })
-```
-
-### Fields not returned unless explicitly requested
-Odoo XML-RPC never returns all fields by default. Always specify fields:
-```javascript
-// Wrong — returns only id and name:
-await odoo.searchRead('stock.picking', [], []);
-
-// Correct:
-await odoo.searchRead('stock.picking', [], ['id', 'name', 'state', 'date', 'origin']);
-```
+### Tracing
+Optional but preferred:
+- authenticate
+- fetch page
+- map records
+- write sink
+- save checkpoint
 
 ---
 
-## packages.json dependencies
+## Resiliency and Reliability
 
-```json
-{
-  "dependencies": {
-    "googleapis": "^118.0.0",
-    "node-cron": "^3.0.2",
-    "xmlrpc": "^1.3.2",
-    "dotenv": "^16.0.0"
-  },
-  "devDependencies": {
-    "nodemon": "^3.0.1"
-  },
-  "engines": {
-    "node": ">=18.0.0"
-  }
-}
-```
+Classify failures before retrying.
+
+### Failure categories
+
+- transient transport failure
+- persistent configuration or auth failure
+- contract/data mismatch
+- sink failure
+- mapping/domain failure
+
+### Retry guidance
+
+Retry only when:
+- the failure is transient
+- the operation is safe to retry
+
+Use:
+- bounded retries
+- exponential backoff
+- jitter
+
+Do not:
+- blindly retry writes that may duplicate side effects
+
+### Reliability rules
+
+- acquire a lock before running
+- checkpoint only after durable success
+- use deterministic ordering
+- preserve or log failed records for replay
+- prefer bounded concurrency over uncontrolled parallelism
 
 ---
 
 ## Security
 
-### .gitignore — mandatory
-Every project must have this before the first `git add`:
-```
-.env
-credentials.json
-*.env*
-```
-Never put credentials in documentation files (.md, .txt, .doc). Use `.env.example` with placeholder values only.
+### Minimum security baseline
 
-### Odoo user — principle of least privilege
-Create a dedicated sync user in Odoo with read-only access restricted to the models the integration needs. Never use an admin account for automated scripts.
+- least-privilege Odoo user
+- least-privilege sink credentials
+- no secrets in repository
+- `.env.example` only with placeholders
+- redact sensitive values in logs
+- rotate secrets if compromised
+- validate configuration without printing secrets
 
-```
-Settings → Users → New User
-- Access Rights: set to minimum needed (e.g. Inventory / Read only)
-- Do NOT use admin credentials
-```
+### Additional guidance
 
-If the credentials are ever compromised, a read-only restricted user limits the blast radius to data exposure — not data modification or deletion.
-
-### Google Service Account — restrict scope
-The service account should only have `Editor` access to the specific spreadsheet, not to the entire Google Drive. Share the sheet with the service account email directly, not at folder/Drive level.
-
-### Railway / deployment secrets
-- Use platform env vars (Railway, Render, Fly.io) — never commit secrets
-- Rotate credentials if they were ever committed to git, even briefly
-- `GOOGLE_CREDENTIALS` should be the minified single-line JSON of the service account — check no newlines crept in
-
-### What this integration does NOT expose
-- No HTTP server or public endpoints — the attack surface is zero from the internet
-- No user input flows into Odoo queries — XML-RPC injection is not a realistic vector
-- No `eval()`, no `exec()`, no dynamic code execution
+- review whether exported data contains PII
+- minimize fields to only what is necessary
+- avoid broad data replication without purpose
+- use dependency and secret scanning in CI if this is a maintained project
 
 ---
 
-## Checklist for every new Odoo integration
+## Diagnostics and Support Scripts
 
-- [ ] `.gitignore` exists and covers `.env`, `credentials.json`, `*.env*`
-- [ ] No real credentials or secrets in any `.md` or documentation file
-- [ ] Odoo sync user is read-only and restricted to needed models only
-- [ ] Google service account has access only to the specific spreadsheet
-- [ ] `node test-odoo.js` authenticates and returns real data
-- [ ] Run `debug-states.js` to confirm actual state values before writing domain filters
-- [ ] `Procfile` exists for Railway deploy
-- [ ] `GOOGLE_SHEET_NAME` is configurable via env var (not hardcoded)
-- [ ] Deduplication key is chosen and persisted in a queryable column
-- [ ] `limit` in searchRead is set high enough for production volume
-- [ ] Error handling in sync loop uses `continue` (one bad record should not abort the batch)
+These scripts are useful for exploration and support, not as a replacement for tests.
+
+Recommended scripts:
+- `test-odoo-connection.js`
+- `inspect-fields.js`
+- `inspect-states.js`
+- `inspect-record.js`
+- `replay-failed-records.js`
+- `dry-run-sync.js`
+
+Examples:
+- inspect actual field presence
+- discover real production states
+- inspect one record shape before coding a mapper
+- replay failed records after a contract fix
+
+---
+
+## Anti-patterns to avoid
+
+Do not default to these patterns unless the user explicitly accepts the trade-offs:
+
+- using the sink as the authoritative checkpoint store
+- using business dates as the default technical watermark when `write_date` is more appropriate
+- allowing overlapping runs without a lock, singleton worker, or equivalent protection
+- retrying writes blindly when side effects may duplicate downstream records
+- treating debug scripts as substitutes for tests
+- parsing display fields like `origin` as durable relational identifiers when better relational fields exist
+- assuming stock quantity fields are globally meaningful without context
+- implying exactly-once guarantees unless they are truly implemented and validated
+
+---
+
+## Common Odoo Gotchas
+
+### many2one values
+Often returned as:
+```javascript
+[id, display_name]
+```
+
+### false values
+Odoo often returns `false` where some systems would return `null`
+
+### field availability
+Fields may differ by:
+- version
+- installed modules
+- customization
+- access rights
+
+### timezone and dates
+Normalize timestamps before comparing or checkpointing
+
+### stock fields
+Do not assume stock quantities are globally meaningful without context
+
+### display fields
+Avoid deriving durable business keys from human-readable fields such as `origin` unless there is no better option and the risk is documented
+
+---
+
+## Support matrix
+
+### Guidance this skill provides
+
+This skill provides strong guidance for:
+- Odoo integration architecture and boundaries
+- XML-RPC and version-aware access patterns
+- checkpointing, idempotency, and overlap prevention
+- testing strategy and observability expectations
+- practical sink selection guidance
+- migration away from fragile script-first defaults
+
+### What this skill does not guarantee
+
+This skill does not guarantee that:
+- every field exists in every Odoo instance
+- every model relation behaves identically across custom modules
+- every stock or accounting workflow has the same semantics in all deployments
+- a generated integration is correct without validating the target instance and business rules
+- exactly-once semantics are available unless explicitly implemented
+
+### Required verification in the target environment
+
+When correctness matters, verify in the target Odoo instance:
+- field existence
+- state values and workflow meanings
+- company/warehouse/context-specific behavior
+- access rights
+- downstream sink guarantees and replay behavior
+
+---
+
+## Deployment Guidance
+
+Deploy as a worker or scheduled job, not as an accidental monolith.
+
+Operational expectations:
+- startup config validation
+- health visibility
+- structured logging
+- graceful shutdown
+- replay path for failed records
+- rollback-safe change strategy
+
+For small deployments, Railway/Render/Fly.io can work.
+For larger deployments, prefer:
+- containerized worker
+- queue/worker runtime
+- managed scheduler + singleton worker
+
+---
+
+## package.json Guidance
+
+Suggested categories:
+
+Runtime:
+- XML-RPC client
+- env validation
+- logging
+- optional telemetry
+
+Test:
+- unit/integration test runner
+- mocks/fixtures
+- contract fixture support
+
+Dev:
+- formatter
+- linter
+- type checker if using TypeScript
+
+Node version:
+- prefer modern LTS
+
+If the project is expected to live beyond a quick utility, prefer TypeScript or runtime schema validation.
+
+---
+
+## Checklist for Every New Odoo Integration
+
+- [ ] Business intent is explicit
+- [ ] Sync mode is explicit: append / upsert / snapshot / reconcile
+- [ ] Checkpoint field and ordering are explicit
+- [ ] Idempotency key is explicit
+- [ ] Checkpoint store is separate from the sink
+- [ ] Overlap prevention is implemented
+- [ ] Configuration is validated at startup
+- [ ] Odoo fields are verified in the target instance
+- [ ] Mapping logic has unit tests
+- [ ] Boundary behavior has integration or contract tests
+- [ ] Runtime logs and metrics are emitted
+- [ ] Failure categories and retry rules are defined
+- [ ] Failed records are observable and replayable
+- [ ] Secrets are not committed
+- [ ] Access rights use least privilege
+- [ ] Deployment and shutdown behavior are safe
+
+---
+
+## Practical Defaults
+
+If the user does not specify otherwise:
+
+- Use a dedicated Odoo gateway
+- Use `write_date` as checkpoint field
+- Use deterministic ordering with `id` tie-breaker
+- Use an external checkpoint store
+- Use structured logs
+- Add a basic metrics surface
+- Prevent overlapping runs
+- Prefer simple deterministic code over clever abstractions
+- Use tests for mapping, checkpointing, and sink behavior
+- Treat Google Sheets as a reporting sink, not source of truth
